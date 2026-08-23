@@ -1,34 +1,49 @@
-name: build-and-deploy
+name: CI
+
 on:
   push:
     branches: [main]
-  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          tags: ${{ vars.DOCKERHUB_USERNAME }}/myapp:${{ github.sha }}
 
-  deploy:
-    needs: build
-    runs-on: self-hosted
-    steps:
-      - run: |
-          kubectl -n demo set image deployment/web \
-            web=ghcr.io/${{ github.repository }}:${{ github.sha }}
-          kubectl -n demo rollout status deployment/web --timeout=120s
-          kubectl -n demo get pods -o wide
+      - name: Update manifest
+        run: |
+          set -euo pipefail
+          IMAGE="${{ vars.DOCKERHUB_USERNAME }}/myapp:${{ github.sha }}"
+          sed -i "s|image: .*/myapp:.*|image: ${IMAGE}|" k8s/deployment.yaml
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet k8s/deployment.yaml; then
+            echo "No change."
+            exit 0
+          fi
+
+          git add k8s/deployment.yaml
+          git commit -m "ci: bump image to ${{ github.sha }}"
+          git pull --rebase origin ${{ github.ref_name }}
+          git push origin HEAD:${{ github.ref_name }}
