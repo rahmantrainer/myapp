@@ -9,14 +9,19 @@ spec:
   selector:
     matchLabels:
       app: myapp
-  strategy: {}
   template:
     metadata:
       labels:
         app: myapp
     spec:
       containers:
-      - image: nginx:1.21
-        name: nginx
-        resources: {}
-status: {}
+      - image: trainerk8s/myapp:bootstrap
+        name: myapp
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
