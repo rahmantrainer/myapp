@@ -15,7 +15,7 @@ spec:
         app: myapp
     spec:
       containers:
-      - image: trainerk8s/myapp:c0022fdec39b09acfda03d39d9b37c3738ffc36d
+      - image: trainerk8s/myapp:7372b033ea9ea1317546f276dd2f4c9c1865b850
         name: myapp
         ports:
         - containerPort: 80
